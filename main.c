@@ -115,6 +115,7 @@ int main() {
 	around for future reference.
 	*/
 
+	XCloseDisplay(display);
 	return 0;
 }
 
