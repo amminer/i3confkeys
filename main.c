@@ -4,6 +4,7 @@
 #include <X11/Xlib.h>
 #include <X11/XKBlib.h>
 #include <X11/Xatom.h>
+#include <X11/Xutil.h>
 
 
 enum qwerty {  // TODO
@@ -46,13 +47,39 @@ unsigned long get_active_window_id(Display* display) {
 }
 
 
-int main() {
-	Display *display;
-	XEvent event, previous_event;
-	unsigned long active_window_id;
+char* handle_keypress(Display *display, XEvent event) {
+	XKeyEvent *e = (XKeyEvent *) &event;
 	KeyCode keycode;
 	KeySym keysym;
-	char *keyname;
+	char str[256 + 1];
+	int nbytes = 0;
+	char *ksname;
+
+	keycode = event.xkey.keycode;
+	keysym = XkbKeycodeToKeysym(display, keycode, 0, 0);
+	nbytes = XLookupString(e, str, 256, &keysym, NULL);
+	ksname = XKeysymToString(keysym);
+	if (e->type == KeyPress) {
+		printf("Key down: %d, %s\n", keycode, ksname);
+	} else {
+		printf("Key up: %d, %s\n", keycode, ksname);
+	}
+	return ksname;
+}
+
+
+void teardown(Display* display){
+	XCloseDisplay(display);
+	exit(0);
+}
+
+
+int main() {
+	Display *display;
+	XEvent event;
+	unsigned long active_window_id;
+	char *last_ksname;
+	char *etype;
 
 	display = XOpenDisplay(NULL);
 	if (display == NULL) {
@@ -78,44 +105,12 @@ int main() {
 	// event loop
 	while (1) {
 		XNextEvent(display, &event);
-		if (event.type == KeyPress) {
-			keycode = event.xkey.keycode;
-			keysym = XkbKeycodeToKeysym(display, keycode, 0, 0);
-			keyname = XKeysymToString(keysym);
-			printf("Key down: %d, %s\n", keycode, keyname);
-		} else if (event.type == KeyRelease) {
-			keycode = event.xkey.keycode;
-			keysym = XkbKeycodeToKeysym(display, keycode, 0, 0);
-			keyname = XKeysymToString(keysym);
-			printf("Key up: %d, %s\n", keycode, keyname);
-		}
-		// hit escape twice to finish up
-		if (keycode == Esc
-		&& previous_event.xkey.keycode == Esc
-		&& previous_event.type == KeyRelease) {
-			// TODO finalize output string using keynames
-			break;  // TODO maybe use ctrl+c instead
-		}
-		previous_event = event;
+		last_ksname = handle_keypress(display, event);
+		if (event.xkey.keycode == Esc) { teardown(display); }  // TODO some other way to quit
+		// TODO accumulate output strings
 	}
 	// TODO clipboard logic
 
-	/*
-	When I press alt, press prtscr, release prtscr, and release alt, I get this:
-
-	Key down: 64, Alt_L
-	Key up: 64, Alt_L
-	Key down: 64, Alt_L
-	Key down: 107, Print
-	Key up: 107, Print
-	Key up: 64, Alt_L
-
-	I was hoping for Sys_Req. It looks like xlib is lower level than I was
-	hoping/expecting. Going to try something else, but wanted to keep this commit
-	around for future reference.
-	*/
-
-	XCloseDisplay(display);
-	return 0;
+	teardown(display);
 }
 

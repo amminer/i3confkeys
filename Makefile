@@ -1,6 +1,10 @@
-main:
-	gcc main.c -o ./i3confkeys -lX11 -lxkbcommon-x11 -lxkbcommon
-run: main
-	./i3confkeys
+cc = gcc
+cflags = -lX11 -lxkbcommon-x11 -lxkbcommon
+exe = i3confkeys
 
+main:
+	$(cc) main.c -o $(exe) $(cflags)
+
+run: main
+	./$(exe)
 
